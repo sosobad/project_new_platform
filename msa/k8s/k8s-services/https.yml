@@ -1,0 +1,30 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: my-issuer
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: junsub705@gmail.com
+    privateKeySecretRef:
+      name: my-issuer
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: a-soladmins-com-tls
+  namespace: soldesk
+spec:
+  secretName: a-soladmins-com-tls
+  duration: 2160h # 90days
+  renewBefore: 360h # 15days
+  issuerRef:
+    name: my-issuer
+    kind: ClusterIssuer
+  commonName: a.soladmins.com
+  dnsNames:
+  - a.soladmins.com

@@ -1,0 +1,14 @@
+.gradle/
+**/build/
+**/.gradle/
+node_modules/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.kubeconfig
+kubeconfig
+.idea/
+.vscode/
