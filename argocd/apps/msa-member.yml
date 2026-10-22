@@ -1,4 +1,4 @@
-apiVersion: argoproj.io/v1alpha1
+﻿apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: msa-member
@@ -6,12 +6,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/sosobad/msa.git
+    repoURL: https://github.com/sosobad/project_new_platform.git
     targetRevision: main
     path: msa/member/k8s
   destination:
     server: https://kubernetes.default.svc
-    namespace: soldesk
+    namespace: msa
   syncPolicy:
     automated:
       prune: true
