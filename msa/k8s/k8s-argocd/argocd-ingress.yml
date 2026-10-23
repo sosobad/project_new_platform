@@ -4,22 +4,25 @@ metadata:
   name: argocd-server-ingress
   namespace: argocd
   annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: my-issuer
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:986881030850:certificate/2091d02f-c8b6-4563-8f16-b7a941d31d1d
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/success-codes: '200-399'
 spec:
-  tls:
-  - hosts:
-      - argo.soladmins.com
-    secretName: argo-soladmins-com-tls
+  ingressClassName: alb
   rules:
-  - host: argo.soladmins.com
-    http:
-      paths:
-        - path: /
-          pathType: Prefix
-
-          backend:
-            service:
-              name: argocd-server
-              port:
-                number: 80
+    - host: argo.soladmins.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443

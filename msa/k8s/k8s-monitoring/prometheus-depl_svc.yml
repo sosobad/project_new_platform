@@ -48,6 +48,8 @@ kind: Service
 metadata:
   name: prometheus-service
   namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
 spec:
   ports:
     - port: 9090
