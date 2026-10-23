@@ -38,6 +38,8 @@ kind: Service
 metadata:
   name: apigateway-service
   namespace: msa
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
 spec:
   type: ClusterIP
   ports:
