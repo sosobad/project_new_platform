@@ -23,8 +23,7 @@ spec:
         ports:
         - containerPort: 8080
         resources:
-        # 而⑦뀒?대꼫媛 ?ъ슜?좎닔 ?덈뒗 由ъ냼?ㅼ쓽 理쒕?移?
-          limits:
+        # 而⑦뀒?대꼫媛 ?ъ슜?좎닔 ?덈뒗 由ъ냼?ㅼ쓽 理쒕?移?          limits:
             cpu: "1"
             memory: "500Mi"
         # 而⑦뀒?대꼫媛 ?쒖옉?좊뻹 蹂댁옣諛쏆븘???섎뒗 理쒖냼 ?먯썝
@@ -48,8 +47,7 @@ spec:
             # healthcheck 寃쎈줈
             path: /health
             port: 8080
-          # 而⑦뀒?대꼫 ?쒖옉 ??吏??
-          initialDelaySeconds: 10
+          # 而⑦뀒?대꼫 ?쒖옉 ??吏??          initialDelaySeconds: 10
           # ?뺤씤 諛섎났 二쇨린
           periodSeconds: 10
 
