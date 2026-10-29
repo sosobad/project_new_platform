@@ -7,6 +7,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: frontend-eks-deploy
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -14,27 +18,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Check OIDC claims
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import os, json, base64, urllib.request
-          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
-          token = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
-          sep = "&" if "?" in url else "?"
-          req = urllib.request.Request(
-              url + sep + "audience=sts.amazonaws.com",
-              headers={"Authorization": "Bearer " + token}
-          )
-          with urllib.request.urlopen(req) as response:
-              jwt = json.load(response)["value"]
-          payload = jwt.split(".")[1]
-          payload += "=" * (-len(payload) % 4)
-          claims = json.loads(base64.urlsafe_b64decode(payload))
-          for key in ("iss", "aud", "sub", "repository", "ref", "environment"):
-              print(f"{key}: {claims.get(key)}")
-          PY
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
@@ -54,8 +37,62 @@ jobs:
           docker build \
             -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
             -f ./msa/frontend/Dockerfile ./msa/frontend
-
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      - name: Save EKS access settings
+        id: access
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws eks describe-cluster \
+            --name msa-platform \
+            --region ap-northeast-2 \
+            --query 'cluster.resourcesVpcConfig.publicAccessCidrs' \
+            --output json > original-cidrs.json
+
+          python3 - <<'PY'
+          import json
+          cidrs = json.load(open("original-cidrs.json"))
+          if not cidrs:
+              raise SystemExit("No existing public CIDRs")
+          print("Original CIDRs:", cidrs)
+          PY
+
+          RUNNER_IP=$(curl --fail --silent --show-error https://checkip.amazonaws.com | tr -d '\r\n')
+          echo "Runner IP: $RUNNER_IP"
+
+          python3 - "$RUNNER_IP" <<'PY'
+          import ipaddress, json, sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          if ip.version != 4 or not ip.is_global:
+              raise SystemExit("Runner IP is not a public IPv4 address")
+          cidrs = json.load(open("original-cidrs.json"))
+          cidrs.append(f"{ip}/32")
+          cidrs = list(dict.fromkeys(cidrs))
+          if len(cidrs) > 50:
+              raise SystemExit("Too many CIDRs")
+          with open("temporary-cidrs.json", "w") as f:
+              json.dump({"publicAccessCidrs": cidrs}, f)
+          PY
+
+      - name: Allow GitHub Runner IP
+        id: allow
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws eks update-cluster-config \
+            --name msa-platform \
+            --region ap-northeast-2 \
+            --resources-vpc-config file://temporary-cidrs.json \
+            --query 'update.id' \
+            --output text > eks-update-id.txt
+
+          aws eks wait cluster-active \
+            --name msa-platform \
+            --region ap-northeast-2
+
+          echo "Runner access update completed"
 
       - name: Configure EKS
         run: |
@@ -74,3 +111,36 @@ jobs:
           kubectl rollout status deployment/frontend-depl \
             -n msa \
             --timeout=300s
+
+      - name: Restore original EKS access
+        if: ${{ always() && steps.allow.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f original-cidrs.json ]; then
+            echo "Original CIDR backup missing; manual recovery required"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          cidrs = json.load(open("original-cidrs.json"))
+          with open("restore-cidrs.json", "w") as f:
+              json.dump({"publicAccessCidrs": cidrs}, f)
+          PY
+
+          aws eks wait cluster-active \
+            --name msa-platform \
+            --region ap-northeast-2
+
+          aws eks update-cluster-config \
+            --name msa-platform \
+            --region ap-northeast-2 \
+            --resources-vpc-config file://restore-cidrs.json
+
+          aws eks wait cluster-active \
+            --name msa-platform \
+            --region ap-northeast-2
+
+          echo "Original EKS public CIDRs restored"
