@@ -101,17 +101,74 @@ jobs:
             --region ap-northeast-2
 
       - name: Deploy Frontend
+        shell: bash
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          set -euo pipefail
+
+          echo "=== Save current deployment image ==="
+
+          PREVIOUS_IMAGE=$(kubectl get deployment frontend-depl \
+            -n msa \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="frontend-container")].image}')
+
+          if [ -z "$PREVIOUS_IMAGE" ]; then
+            echo "::error::Cannot determine previous image"
+            exit 1
+          fi
+
+          echo "Previous image: $PREVIOUS_IMAGE"
+
+          NEW_IMAGE="986881030850.dkr.ecr.ap-northeast-2.amazonaws.com/frontend:$IMAGE_TAG"
+
+          echo "=== Deploy new image ==="
+
           kubectl set image deployment/frontend-depl \
-            frontend-container=986881030850.dkr.ecr.ap-northeast-2.amazonaws.com/frontend:$IMAGE_TAG \
+            frontend-container="$NEW_IMAGE" \
             -n msa
 
-          kubectl rollout status deployment/frontend-depl \
-            -n msa \
-            --timeout=300s
+          echo "=== Check rollout ==="
 
+          if kubectl rollout status deployment/frontend-depl \
+            -n msa \
+            --timeout=180s; then
+
+            echo "DEPLOYMENT SUCCESS"
+            exit 0
+          fi
+
+          echo "::warning::Deployment failed. Starting automatic rollback."
+
+          echo "=== Automatic rollback ==="
+
+          if ! kubectl set image deployment/frontend-depl \
+            frontend-container="$PREVIOUS_IMAGE" \
+            -n msa; then
+            echo "::error::Automatic rollback command failed"
+            exit 1
+          fi
+
+          if kubectl rollout status deployment/frontend-depl \
+            -n msa \
+            --timeout=180s; then
+
+            RESTORED_IMAGE=$(kubectl get deployment frontend-depl \
+              -n msa \
+              -o jsonpath='{.spec.template.spec.containers[?(@.name=="frontend-container")].image}')
+
+            if [ "$RESTORED_IMAGE" = "$PREVIOUS_IMAGE" ]; then
+              echo "AUTOMATIC ROLLBACK SUCCESS"
+              echo "Restored image: $RESTORED_IMAGE"
+              echo "::error::New deployment failed, but rollback succeeded"
+            else
+              echo "::error::Rollback image mismatch"
+            fi
+          else
+            echo "::error::Automatic rollback failed"
+          fi
+
+          exit 1
       - name: Restore original EKS access
         if: ${{ always() && steps.allow.outcome != 'skipped' }}
         shell: bash
