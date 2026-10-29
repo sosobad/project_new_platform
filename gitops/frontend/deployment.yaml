@@ -1,0 +1,20 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-depl
+  namespace: msa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend-container
+          image: 986881030850.dkr.ecr.ap-northeast-2.amazonaws.com/frontend:v20261028
+          ports:
+            - containerPort: 80
