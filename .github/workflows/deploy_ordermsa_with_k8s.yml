@@ -1,9 +1,7 @@
 name: deploy order order-backend
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
