@@ -120,7 +120,7 @@ jobs:
 
           echo "Previous image: $PREVIOUS_IMAGE"
 
-          NEW_IMAGE="986881030850.dkr.ecr.ap-northeast-2.amazonaws.com/frontend:$IMAGE_TAG"
+          NEW_IMAGE="986881030850.dkr.ecr.ap-northeast-2.amazonaws.com/frontend:rollback-test-invalid"
 
           echo "=== Deploy new image ==="
 
